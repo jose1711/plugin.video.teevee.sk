@@ -1,5 +1,5 @@
 # -*- coding: UTF-8 -*-
-#/*
+# /*
 # *      Copyright (C) 2012 Lubomir Kucera
 # *
 # *
@@ -19,16 +19,18 @@
 # *  http://www.gnu.org/copyleft/gpl.html
 # *
 # */
-import urllib2,urllib,re,os,sys,cookielib
+import urllib2
+import urllib
+import cookielib
 import util
 from provider import ContentProvider
 import lxml.html
 import urlparse
 import cgi
 
-class TeeveeContentProvider(ContentProvider):
 
-    urls = { 'Filmy' : 'http://www.filmy.teevee.sk', 'Seriály' : 'http://www.teevee.sk' }
+class TeeveeContentProvider(ContentProvider):
+    urls = {'Filmy': 'http://www.filmy.teevee.sk', 'Seriály': 'http://www.teevee.sk'}
 
     def __init__(self, username=None, password=None, filter=None, tmp_dir='.'):
         ContentProvider.__init__(self, 'teevee.sk', 'http://www.teevee.sk', username, password, filter)
@@ -36,7 +38,7 @@ class TeeveeContentProvider(ContentProvider):
         urllib2.install_opener(opener)
 
     def capabilities(self):
-        return [ 'resolve', 'cagetories', 'search' ]
+        return ['resolve', 'cagetories', 'search']
 
     def categories(self):
         result = []
@@ -51,7 +53,7 @@ class TeeveeContentProvider(ContentProvider):
         result = []
         for category in self.urls.keys():
             for result_item in lxml.html.parse(self.urls[category] + '/ajax/_search_engine.php?search=' +
-                urllib.quote_plus(keyword) + ('&film=1' if category == 'Filmy' else '')).xpath('//a'):
+                    urllib.quote_plus(keyword) + ('&film=1' if category == 'Filmy' else '')).xpath('//a'):
                 if 'href' in result_item.attrib:
                     item = self.video_item()
                     item['title'] = result_item.text.encode('Latin1')
@@ -84,7 +86,7 @@ class TeeveeContentProvider(ContentProvider):
         params = urlparse.parse_qs(urlparse.urlparse(url).query)
         parts = list(urlparse.urlsplit(url))
         d = dict(cgi.parse_qsl(parts[3]))
-        d.update(strana = (str(int(params['strana'][0]) + 1) if 'strana' in params else '1'))
+        d.update(strana=(str(int(params['strana'][0]) + 1) if 'strana' in params else '1'))
         parts[3] = urllib.urlencode(d)
         url = urlparse.urlunsplit(parts)
         if len(lxml.html.parse(url).xpath('//a/span')) > 0:
@@ -125,9 +127,11 @@ class TeeveeContentProvider(ContentProvider):
         data = ''
         for server in lxml.html.parse(item['url']).xpath('//div[@id="menuServers"]/a'):
             data += util.request('/'.join(item['url'].split('/')[:3]) +
-                '/ajax/_change_page.php?stav=changeserver&server_id=' + server.attrib['href'].strip('#'))
-        result = self.findstreams(data + item['url'], [ '<embed( )src=\"(?P<url>[^\"]+)', '<object(.+?)data=\"(?P<url>[^\"]+)',
-            '<iframe(.+?)src=[\"\'](?P<url>.+?)[\'\"]', '<object.*?data=(?P<url>.+?)</object>' ])
+                                 '/ajax/_change_page.php?stav=changeserver&server_id=' + server.attrib['href'].strip(
+                '#'))
+        result = self.findstreams(data + item['url'],
+                                  ['<embed( )src=\"(?P<url>[^\"]+)', '<object(.+?)data=\"(?P<url>[^\"]+)',
+                                   '<iframe(.+?)src=[\"\'](?P<url>.+?)[\'\"]', '<object.*?data=(?P<url>.+?)</object>'])
         if len(result) == 1:
             return result[0]
         elif len(result) > 1:
