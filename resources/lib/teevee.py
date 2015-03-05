@@ -24,9 +24,10 @@ import urllib
 import cookielib
 import util
 from provider import ContentProvider
-import lxml.html
+from bs4 import BeautifulSoup
 import urlparse
 import cgi
+import re
 
 
 class TeeveeContentProvider(ContentProvider):
@@ -38,7 +39,7 @@ class TeeveeContentProvider(ContentProvider):
         urllib2.install_opener(opener)
 
     def capabilities(self):
-        return ['resolve', 'cagetories', 'search']
+        return ['resolve', 'categories', 'search']
 
     def categories(self):
         result = []
@@ -49,15 +50,18 @@ class TeeveeContentProvider(ContentProvider):
             result.append(item)
         return result
 
+    def parse(self, url):
+        return BeautifulSoup(util.request(url))
+
     def search(self, keyword):
         result = []
         for category in self.urls.keys():
-            for result_item in lxml.html.parse(self.urls[category] + '/ajax/_search_engine.php?search=' +
-                    urllib.quote_plus(keyword) + ('&film=1' if category == 'Filmy' else '')).xpath('//a'):
-                if 'href' in result_item.attrib:
+            for element in self.parse(self.urls[category] + '/ajax/_search_engine.php?search=' +
+                    urllib.quote_plus(keyword) + ('&film=1' if category == 'Filmy' else '')).find_all('a'):
+                if element.get('href') is not None:
                     item = self.video_item()
-                    item['title'] = result_item.text.encode('Latin1')
-                    item['url'] = result_item.attrib['href']
+                    item['title'] = element.text
+                    item['url'] = element.get('href')
                     result.append(item)
         return result
 
@@ -75,13 +79,13 @@ class TeeveeContentProvider(ContentProvider):
 
     def list_movies(self, url):
         result = []
-        for movie in lxml.html.parse(url).xpath('//a[span]'):
+        for movie in self.parse(url).find_all('a'):
+            date = movie.find('span', 'date')
+            if date is not None:
+                date.extract()
             item = self.video_item()
-            item['title'] = movie.text.encode('Latin1')
-            dates = movie.xpath('./span[@class="date"]')
-            if len(dates) > 0:
-                item['title'] += ' ' + dates[0].text.encode('Latin1')
-            item['url'] = movie.attrib['href']
+            item['title'] = movie.text + (' ' + date.text if date is not None else '')
+            item['url'] = movie.get('href')
             result.append(item)
         params = urlparse.parse_qs(urlparse.urlparse(url).query)
         parts = list(urlparse.urlsplit(url))
@@ -89,7 +93,7 @@ class TeeveeContentProvider(ContentProvider):
         d.update(strana=(str(int(params['strana'][0]) + 1) if 'strana' in params else '1'))
         parts[3] = urllib.urlencode(d)
         url = urlparse.urlunsplit(parts)
-        if len(lxml.html.parse(url).xpath('//a/span')) > 0:
+        if len(self.parse(url).select('a > span')) > 0:
             item = self.dir_item()
             item['type'] = 'next'
             item['url'] = url
@@ -98,38 +102,39 @@ class TeeveeContentProvider(ContentProvider):
 
     def list_series(self, url):
         result = []
-        for serie in lxml.html.parse(url).xpath('//table/tr/td/a'):
+        for series in self.parse(url).select('table > tr > td > a'):
             item = self.dir_item()
-            item['title'] = serie.text.encode('Latin1')
-            item['url'] = url + '?serial_id=' + serie.attrib['href'].split('/')[-1]
+            item['title'] = series.text
+            item['url'] = url + '?serial_id=' + series.get('href').split('/')[-1]
             result.append(item)
         return result
 
     def list_seasons(self, url):
         result = []
-        for serie_i, serie in enumerate(lxml.html.parse(url).xpath('//div[@class="se"]/a')):
+        for season in self.parse(url).select('.se > a'):
             item = self.dir_item()
-            item['title'] = serie.text.encode('Latin1')
-            item['url'] = url + '&seria_id=' + str(serie_i + 1)
+            item['title'] = season.text
+            item['url'] = url + '&seria_id=' + re.match(r'ShowList\([\d\s]+,\s*\'[^\']+\'\s*,\s*(\d+)\s*\)',
+                                                        season.get('onclick')).group(1)
             result.append(item)
         return result
 
     def list_episodes(self, url):
         result = []
-        for serie in lxml.html.parse(url).xpath('//div/div/a'):
+        for serie in self.parse(url).select('.list > .cols > a'):
             item = self.video_item()
-            item['title'] = serie.text.encode('Latin1')
-            item['url'] = serie.attrib['href']
+            item['title'] = serie.text
+            item['url'] = serie.get('href')
             result.append(item)
         return result
 
     def resolve(self, item, captcha_cb=None, select_cb=None):
         data = ''
-        for server in lxml.html.parse(item['url']).xpath('//div[@id="menuServers"]/a'):
-            data += util.request('/'.join(item['url'].split('/')[:3]) +
-                                 '/ajax/_change_page.php?stav=changeserver&server_id=' + server.attrib['href'].strip(
-                '#'))
-        result = self.findstreams(data + item['url'],
+        for server in self.parse(item['url']).select('#menuServers > a'):
+            base_url = '/'.join(item['url'].split('/')[:3])
+            data += util.request(base_url + '/ajax/_change_page.php?stav=changeserver&server_id=' +
+                                 server.get('href').strip('#') + ('&film=1' if '.filmy.' in base_url else ''))
+        result = self.findstreams(data,
                                   ['<embed( )src=\"(?P<url>[^\"]+)', '<object(.+?)data=\"(?P<url>[^\"]+)',
                                    '<iframe(.+?)src=[\"\'](?P<url>.+?)[\'\"]', '<object.*?data=(?P<url>.+?)</object>'])
         if len(result) == 1:
