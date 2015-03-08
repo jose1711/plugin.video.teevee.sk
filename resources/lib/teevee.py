@@ -129,14 +129,19 @@ class TeeveeContentProvider(ContentProvider):
         return result
 
     def resolve(self, item, captcha_cb=None, select_cb=None):
-        data = ''
+        streams = []
         for server in self.parse(item['url']).select('#menuServers > a'):
             base_url = '/'.join(item['url'].split('/')[:3])
-            data += util.request(base_url + '/ajax/_change_page.php?stav=changeserver&server_id=' +
-                                 server.get('href').strip('#') + ('&film=1' if '.filmy.' in base_url else ''))
-        result = self.findstreams(data,
-                                  ['<embed( )src=\"(?P<url>[^\"]+)', '<object(.+?)data=\"(?P<url>[^\"]+)',
-                                   '<iframe(.+?)src=[\"\'](?P<url>.+?)[\'\"]', '<object.*?data=(?P<url>.+?)</object>'])
+            tree = self.parse(base_url + '/ajax/_change_page.php?stav=changeserver&server_id=' +
+                              server.get('href').strip('#') + ('&film=1' if '.filmy.' in base_url else ''))
+            for stream in tree.find_all(['embed', 'object', 'iframe']):
+                src = stream.get('src')
+                if src:
+                    streams.append(src)
+                data = stream.get('data')
+                if data:
+                    streams.append(data)
+        result = self.findstreams('\n'.join(streams), ['(?P<url>[^\n]+)'])
         if len(result) == 1:
             return result[0]
         elif len(result) > 1:
