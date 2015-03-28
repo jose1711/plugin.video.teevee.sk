@@ -19,14 +19,11 @@
 # *  http://www.gnu.org/copyleft/gpl.html
 # *
 # */
-import urllib2
 import urllib
-import cookielib
 import util
 from provider import ContentProvider
 from bs4 import BeautifulSoup
 import urlparse
-import cgi
 import re
 
 
@@ -35,8 +32,7 @@ class TeeveeContentProvider(ContentProvider):
 
     def __init__(self, username=None, password=None, filter=None, tmp_dir='.'):
         ContentProvider.__init__(self, 'teevee.sk', 'http://www.teevee.sk', username, password, filter)
-        opener = urllib2.build_opener(urllib2.HTTPCookieProcessor(cookielib.LWPCookieJar()))
-        urllib2.install_opener(opener)
+        util.init_urllib()
 
     def capabilities(self):
         return ['resolve', 'categories', 'search']
@@ -67,9 +63,9 @@ class TeeveeContentProvider(ContentProvider):
 
     def list(self, url):
         if '.filmy.' in url:
-            if url.count('&') == 0:
-                return self.list_movies(url + '/ajax/_filmTable.php?showmore=1&strana=1')
-            return self.list_movies(url)
+            if url.count('#') > 0 or url.count('&') > 0:
+                return self.list_movies(url)
+            return self.list_genres(url)
         else:
             if url.count('/') == 2:
                 return self.list_series(url + '/ajax/_serials_list.php')
@@ -77,23 +73,46 @@ class TeeveeContentProvider(ContentProvider):
                 return self.list_seasons(url)
             return self.list_episodes(url)
 
+    def list_genres(self, url):
+        result = []
+        for option in self.parse(url + '/filmy/').select('#filter_film [name=filterFilm] [name^=category] option'):
+            item = self.dir_item()
+            item['title'] = option.text if option.text != '-' else 'Všetky'
+            item['url'] = url + '#' + option.get('value')
+            result.append(item)
+        return result
+
     def list_movies(self, url):
         result = []
-        for movie in self.parse(url).find_all('a'):
-            date = movie.find('span', 'date')
-            if date is not None:
-                date.extract()
-            item = self.video_item()
-            item['title'] = movie.text + (' ' + date.text if date is not None else '')
-            item['url'] = movie.get('href')
-            result.append(item)
-        params = urlparse.parse_qs(urlparse.urlparse(url).query)
-        parts = list(urlparse.urlsplit(url))
-        d = dict(cgi.parse_qsl(parts[3]))
-        d.update(strana=(str(int(params['strana'][0]) + 1) if 'strana' in params else '1'))
-        parts[3] = urllib.urlencode(d)
-        url = urlparse.urlunsplit(parts)
-        if len(self.parse(url).select('a > span')) > 0:
+        path = ''
+        if '#' in url:
+            url, category = url.split('#', 1)
+            path = '/ajax/_filmTable.php?filterfilm=1' + \
+                   ('&filter[category][]=' + category if len(category) > 0 else '') + \
+                   '&filter[description]=1&filter[img_show]=1&filter[show_hd]=0&filter[order]=best'
+        for movie in self.parse(url + path).find_all('tr'):
+            images = movie.select('td a img')
+            for link in movie.select('td a'):
+                if not link.img:
+                    date = link.find('span', 'date')
+                    if date is not None:
+                        date.extract()
+                    item = self.video_item()
+                    item['title'] = link.text + (' ' + date.text if date is not None else '')
+                    item['url'] = link.get('href')
+                    if len(images) > 0:
+                        item['img'] = images[0].get('src')
+                    result.append(item)
+        if 'showmore' not in url:
+            url += '/ajax/_filmTable.php?showmore=1&strana=1'
+        else:
+            params = urlparse.parse_qs(urlparse.urlparse(url).query)
+            parts = list(urlparse.urlsplit(url))
+            d = dict(urlparse.parse_qsl(parts[3]))
+            d.update(strana=(str(int(params['strana'][0]) + 1) if 'strana' in params else '1'))
+            parts[3] = urllib.urlencode(d)
+            url = urlparse.urlunsplit(parts)
+        if len(self.parse(url).select('tr td a span')) > 0:
             item = self.dir_item()
             item['type'] = 'next'
             item['url'] = url
