@@ -1,5 +1,5 @@
 # -*- coding: UTF-8 -*-
-#/*
+# /*
 # *      Copyright (C) Lubomir Kucera
 # *
 # *
@@ -20,17 +20,19 @@
 # *
 # */
 import os
-import xbmc,xbmcaddon,util,xbmcprovider,xbmcutil
-__scriptid__   = 'plugin.video.teevee.sk'
-__scriptname__ = 'teevee.sk'
-__addon__      = xbmcaddon.Addon(id=__scriptid__)
-__language__   = __addon__.getLocalizedString
+import xbmc, xbmcaddon, util, xbmcprovider, xbmcutil
 
-sys.path.append( os.path.join ( __addon__.getAddonInfo('path'), 'resources','lib') )
+__scriptid__ = 'plugin.video.teevee.sk'
+__scriptname__ = 'teevee.sk'
+__addon__ = xbmcaddon.Addon(id=__scriptid__)
+__language__ = __addon__.getLocalizedString
+
+sys.path.append(os.path.join(__addon__.getAddonInfo('path'), 'resources', 'lib'))
 import teevee
-settings = {'downloads':__addon__.getSetting('downloads'),'quality':__addon__.getSetting('quality')}
+
+settings = {'downloads': __addon__.getSetting('downloads'), 'quality': __addon__.getSetting('quality')}
 
 params = util.params()
 if params == {}:
-	xbmcutil.init_usage_reporting( __scriptid__)
-xbmcprovider.XBMCMultiResolverContentProvider(teevee.TeeveeContentProvider(),settings,__addon__).run(params)
+    xbmcutil.init_usage_reporting(__scriptid__)
+xbmcprovider.XBMCMultiResolverContentProvider(teevee.TeeveeContentProvider(), settings, __addon__).run(params)
