@@ -51,13 +51,13 @@ class TeeveeContentProvider(ContentProvider):
 
     def search(self, keyword):
         result = []
-        for category in self.urls.keys():
-            for element in self.parse(self.urls[category] + '/ajax/_search_engine.php?search=' +
-                    urllib.quote_plus(keyword) + ('&film=1' if category == 'Filmy' else '')).find_all('a'):
-                if element.get('href') is not None:
+        for name, url in self.urls.items():
+            for link in self.parse(url + '/ajax/_search_engine.php?search=' + urllib.quote_plus(keyword) +
+                                   ('&film=1' if '.filmy.' in url else '')).find_all('a'):
+                if link.get('href') is not None:
                     item = self.video_item()
-                    item['title'] = element.text
-                    item['url'] = element.get('href')
+                    item['title'] = link.text
+                    item['url'] = link.get('href')
                     result.append(item)
         return result
 
