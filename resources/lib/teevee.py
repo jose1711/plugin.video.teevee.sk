@@ -19,7 +19,9 @@
 # *  http://www.gnu.org/copyleft/gpl.html
 # *
 # */
+import cookielib
 import urllib
+import urllib2
 import util
 from provider import ContentProvider
 from bs4 import BeautifulSoup
@@ -30,9 +32,21 @@ import re
 class TeeveeContentProvider(ContentProvider):
     urls = {'Filmy': 'http://www.filmy.teevee.sk', 'Seriály': 'http://www.teevee.sk'}
 
-    def __init__(self, username=None, password=None, filter=None, tmp_dir='.'):
+    def __init__(self, username=None, password=None, filter=None):
         ContentProvider.__init__(self, 'teevee.sk', 'http://www.teevee.sk', username, password, filter)
-        util.init_urllib()
+        self.cookie_jar = cookielib.LWPCookieJar(self.tmp_dir + '/cookies')
+        try:
+            self.cookie_jar.load(ignore_discard=True, ignore_expires=True)
+        except IOError:
+            pass
+        opener = urllib2.build_opener(urllib2.HTTPCookieProcessor(self.cookie_jar))
+        urllib2.install_opener(opener)
+
+    def __del__(self):
+        try:
+            self.cookie_jar.save(ignore_discard=True, ignore_expires=True)
+        except IOError:
+            pass
 
     def capabilities(self):
         return ['resolve', 'categories', 'search']
