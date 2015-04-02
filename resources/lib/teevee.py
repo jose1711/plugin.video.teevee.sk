@@ -20,6 +20,7 @@
 # *
 # */
 import urllib
+from urllib2 import URLError
 import util
 from provider import ContentProvider
 from bs4 import BeautifulSoup
@@ -152,17 +153,25 @@ class TeeveeContentProvider(ContentProvider):
 
     def resolve(self, item, captcha_cb=None, select_cb=None):
         streams = []
+
+        def find_streams(url):
+            for stream in self.parse(url).find_all(['embed', 'object', 'iframe', 'script']):
+                for attribute in ['src', 'data']:
+                    value = stream.get(attribute)
+                    if value:
+                        streams.append(value)
+
         for server in self.parse(item['url']).select('#menuServers > a'):
             base_url = '/'.join(item['url'].split('/')[:3])
-            tree = self.parse(base_url + '/ajax/_change_page.php?stav=changeserver&server_id=' +
-                              server.get('href').strip('#') + ('&film=1' if '.filmy.' in base_url else ''))
-            for stream in tree.find_all(['embed', 'object', 'iframe']):
-                src = stream.get('src')
-                if src:
-                    streams.append(src)
-                data = stream.get('data')
-                if data:
-                    streams.append(data)
+            find_streams(base_url + '/ajax/_change_page.php?stav=changeserver&server_id=' +
+                         server.get('href').strip('#') + ('&film=1' if '.filmy.' in base_url else ''))
+        for url in streams:
+            try:
+                find_streams(url)
+            except ValueError:
+                pass
+            except URLError:
+                pass
         result = self.findstreams('\n'.join(streams), ['(?P<url>[^\n]+)'])
         if len(result) == 1:
             return result[0]
