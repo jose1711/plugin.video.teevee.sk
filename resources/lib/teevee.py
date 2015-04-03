@@ -57,7 +57,7 @@ class TeeveeContentProvider(ContentProvider):
         result = []
         for name, url in self.urls.items():
             for link in self.parse(url + '/ajax/_search_engine.php?search=' + urllib.quote_plus(keyword) +
-                                   ('&film=1' if '.filmy.' in url else '')).find_all('a'):
+                    ('&film=1' if '.filmy.' in url else '')).find_all('a'):
                 if link.get('href') is not None:
                     item = self.video_item()
                     item['title'] = link.text
@@ -158,7 +158,8 @@ class TeeveeContentProvider(ContentProvider):
             for stream in self.parse(url).find_all(['embed', 'object', 'iframe', 'script']):
                 for attribute in ['src', 'data']:
                     value = stream.get(attribute)
-                    if value:
+                    if value and ((stream.name == 'script' and value.startswith('data:'))
+                                  or stream.name != 'script'):
                         streams.append(value)
 
         for server in self.parse(item['url']).select('#menuServers > a'):
