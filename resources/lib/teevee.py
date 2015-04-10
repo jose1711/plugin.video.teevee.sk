@@ -56,8 +56,8 @@ class TeeveeContentProvider(ContentProvider):
     def search(self, keyword):
         result = []
         for name, url in self.urls.items():
-            for link in self.parse(url + '/ajax/_search_engine.php?search=' + urllib.quote_plus(keyword) +
-                    ('&film=1' if '.filmy.' in url else '')).find_all('a'):
+            for link in self.parse(url + '/ajax/_search_engine.php?search=' + urllib.quote_plus(
+                    keyword) + ('&film=1' if '.filmy.' in url else '')).find_all('a'):
                 if link.get('href') is not None:
                     item = self.video_item()
                     item['title'] = link.text
@@ -79,7 +79,8 @@ class TeeveeContentProvider(ContentProvider):
 
     def list_genres(self, url):
         result = []
-        for option in self.parse(url + '/filmy/').select('#filter_film [name=filterFilm] [name^=category] option'):
+        for option in self.parse(url + '/filmy/').select(
+                '#filter_film [name=filterFilm] [name^=category] option'):
             item = self.dir_item()
             item['title'] = option.text if option.text != '-' else 'Všetky'
             item['url'] = url + '#' + option.get('value')
@@ -137,8 +138,9 @@ class TeeveeContentProvider(ContentProvider):
         for season in self.parse(url).select('.se > a'):
             item = self.dir_item()
             item['title'] = season.text
-            item['url'] = url + '&seria_id=' + re.match(r'ShowList\([\d\s]+,\s*\'[^\']+\'\s*,\s*(\d+)\s*\)',
-                                                        season.get('onclick')).group(1)
+            item['url'] = url + '&seria_id=' + re.match(
+                r'ShowList\([\d\s]+,\s*\'[^\']+\'\s*,\s*(\d+)\s*\)',
+                season.get('onclick')).group(1)
             result.append(item)
         return result
 
@@ -173,7 +175,7 @@ class TeeveeContentProvider(ContentProvider):
                 pass
             except URLError:
                 pass
-        result = self.findstreams('\n'.join(streams), ['(?P<url>[^\n]+)'])
+        result = self.findstreams(streams)
         if len(result) == 1:
             return result[0]
         elif len(result) > 1:
