@@ -51,7 +51,7 @@ class TeeveeContentProvider(ContentProvider):
         return result
 
     def parse(self, url):
-        return BeautifulSoup(util.request(url))
+        return BeautifulSoup(util.request(url), 'html5lib', from_encoding='utf-8')
 
     def search(self, keyword):
         result = []
@@ -95,19 +95,19 @@ class TeeveeContentProvider(ContentProvider):
             path = '/ajax/_filmTable.php?filterfilm=1' + \
                    ('&filter[category][]=' + category if len(category) > 0 else '') + \
                    '&filter[description]=1&filter[img_show]=1&filter[show_hd]=0&filter[order]=best'
-        for movie in self.parse(url + path).find_all('tr'):
-            images = movie.select('td a img')
-            for link in movie.select('td a'):
-                if not link.img:
-                    date = link.find('span', 'date')
-                    if date is not None:
-                        date.extract()
-                    item = self.video_item()
-                    item['title'] = link.text + (' ' + date.text if date is not None else '')
-                    item['url'] = link.get('href')
-                    if len(images) > 0:
-                        item['img'] = images[0].get('src')
-                    result.append(item)
+        for date in self.parse(url + path).select('a span.date'):
+            link = date.parent
+            date.extract()
+            if len(link.text) > 0:
+                image = link.find_previous('a')
+                if image:
+                    image = image.find('img')
+                item = self.video_item()
+                item['title'] = link.text + (' ' + date.text if date is not None else '')
+                item['url'] = link.get('href')
+                if image:
+                    item['img'] = image.get('src')
+                result.append(item)
         if 'showmore' not in url:
             url += '/ajax/_filmTable.php?showmore=1&strana=1'
         else:
@@ -117,7 +117,7 @@ class TeeveeContentProvider(ContentProvider):
             d.update(strana=(str(int(params['strana'][0]) + 1) if 'strana' in params else '1'))
             parts[3] = urllib.urlencode(d)
             url = urlparse.urlunsplit(parts)
-        if len(self.parse(url).select('tr td a span')) > 0:
+        if len(self.parse(url).select('a span')) > 0:
             item = self.dir_item()
             item['type'] = 'next'
             item['url'] = url
@@ -126,7 +126,7 @@ class TeeveeContentProvider(ContentProvider):
 
     def list_series(self, url):
         result = []
-        for series in self.parse(url).select('table > tr > td > a'):
+        for series in self.parse(url).select('table tr > td > a'):
             item = self.dir_item()
             item['title'] = series.text
             item['url'] = url + '?serial_id=' + series.get('href').split('/')[-1]
@@ -160,8 +160,9 @@ class TeeveeContentProvider(ContentProvider):
             for stream in self.parse(url).find_all(['embed', 'object', 'iframe', 'script']):
                 for attribute in ['src', 'data']:
                     value = stream.get(attribute)
-                    if value and ((stream.name == 'script' and value.startswith('data:'))
-                                  or stream.name != 'script'):
+                    if value:
+                        if stream.name == 'script' and not value.startswith('data:'):
+                            continue
                         streams.append(value)
 
         for server in self.parse(item['url']).select('#menuServers > a'):
