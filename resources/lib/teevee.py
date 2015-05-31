@@ -26,6 +26,7 @@ from provider import ContentProvider
 from bs4 import BeautifulSoup
 import urlparse
 import re
+from copy import deepcopy
 
 
 class TeeveeContentProvider(ContentProvider):
@@ -156,22 +157,27 @@ class TeeveeContentProvider(ContentProvider):
     def resolve(self, item, captcha_cb=None, select_cb=None):
         streams = []
 
-        def find_streams(url):
-            for stream in self.parse(url).find_all(['embed', 'object', 'iframe', 'script']):
+        def find_streams(stream):
+            for src in self.parse(stream['url']).find_all(['embed', 'object', 'iframe', 'script']):
                 for attribute in ['src', 'data']:
-                    value = stream.get(attribute)
+                    value = src.get(attribute)
                     if value:
-                        if stream.name == 'script' and not value.startswith('data:'):
+                        if src.name == 'script' and not value.startswith('data:'):
                             continue
-                        streams.append(value)
+                        new_stream = deepcopy(stream)
+                        new_stream['url'] = value
+                        streams.append(new_stream)
 
         for server in self.parse(item['url']).select('#menuServers > a'):
+            language = server.find('span', '')
             base_url = '/'.join(item['url'].split('/')[:3])
-            find_streams(base_url + '/ajax/_change_page.php?stav=changeserver&server_id=' +
-                         server.get('href').strip('#') + ('&film=1' if '.filmy.' in base_url else ''))
-        for url in streams:
+            find_streams({'url': '%s/ajax/_change_page.php?stav=changeserver&server_id=%s%s' %
+                                 (base_url, server.get('href').strip('#'),
+                                  '&film=1' if '.filmy.' in base_url else ''),
+                          'lang': ' %s dabing' % language.text.strip('()') if language else ''})
+        for stream in streams:
             try:
-                find_streams(url)
+                find_streams(stream)
             except ValueError:
                 pass
             except URLError:
