@@ -170,11 +170,12 @@ class TeeveeContentProvider(ContentProvider):
 
         for server in self.parse(item['url']).select('#menuServers > a'):
             language = server.find('span', '')
+            language = ' %s dabing' % re.sub(r'\W+', '', language.text) if language else ''
             base_url = '/'.join(item['url'].split('/')[:3])
             find_streams({'url': '%s/ajax/_change_page.php?stav=changeserver&server_id=%s%s' %
                                  (base_url, server.get('href').strip('#'),
                                   '&film=1' if '.filmy.' in base_url else ''),
-                          'lang': ' %s dabing' % language.text.strip('()') if language else ''})
+                          'lang': language})
         for stream in streams:
             try:
                 find_streams(stream)
