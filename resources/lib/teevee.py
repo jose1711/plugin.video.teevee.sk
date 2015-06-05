@@ -103,11 +103,18 @@ class TeeveeContentProvider(ContentProvider):
                 image = link.find_previous('a')
                 if image:
                     image = image.find('img')
+                plot = link.find_next_sibling('span')
                 item = self.video_item()
-                item['title'] = link.text + (' ' + date.text if date is not None else '')
+                item['title'] = link.text + ' ' + date.text
                 item['url'] = link.get('href')
+                try:
+                    item['year'] = int(re.sub(r'\W+', '', date.text))
+                except ValueError:
+                    pass
                 if image:
                     item['img'] = image.get('src')
+                if plot:
+                    item['plot'] = plot.text.strip(' -')
                 result.append(item)
         if 'showmore' not in url:
             url += '/ajax/_filmTable.php?showmore=1&strana=1'
