@@ -30,7 +30,7 @@ from copy import deepcopy
 
 
 class TeeveeContentProvider(ContentProvider):
-    urls = {'Filmy': 'http://www.filmy.teevee.sk', 'Seriály': 'http://www.teevee.sk'}
+    urls = {'Filmy': 'http://www.filmy.teevee.sk'}
 
     def __init__(self, username=None, password=None, filter=None):
         ContentProvider.__init__(self, 'teevee.sk', 'http://www.teevee.sk', username, password, filter)
@@ -67,16 +67,9 @@ class TeeveeContentProvider(ContentProvider):
         return result
 
     def list(self, url):
-        if '.filmy.' in url:
-            if url.count('#') > 0 or url.count('&') > 0:
-                return self.list_movies(url)
-            return self.list_genres(url)
-        else:
-            if url.count('/') == 2:
-                return self.list_series(url + '/ajax/_serials_list.php')
-            elif url.count('/') == 4 and url.count('&') == 0:
-                return self.list_seasons(url)
-            return self.list_episodes(url)
+        if url.count('#') > 0 or url.count('&') > 0:
+            return self.list_movies(url)
+        return self.list_genres(url)
 
     def list_genres(self, url):
         result = []
@@ -129,35 +122,6 @@ class TeeveeContentProvider(ContentProvider):
             item = self.dir_item()
             item['type'] = 'next'
             item['url'] = url
-            result.append(item)
-        return result
-
-    def list_series(self, url):
-        result = []
-        for series in self.parse(url).select('table tr > td > a'):
-            item = self.dir_item()
-            item['title'] = series.text
-            item['url'] = url + '?serial_id=' + series.get('href').split('/')[-1]
-            result.append(item)
-        return result
-
-    def list_seasons(self, url):
-        result = []
-        for season in self.parse(url).select('.se > a'):
-            item = self.dir_item()
-            item['title'] = season.text
-            item['url'] = url + '&seria_id=' + re.match(
-                r'ShowList\([\d\s]+,\s*\'[^\']+\'\s*,\s*(\d+)\s*\)',
-                season.get('onclick')).group(1)
-            result.append(item)
-        return result
-
-    def list_episodes(self, url):
-        result = []
-        for serie in self.parse(url).select('.list > .cols > a'):
-            item = self.video_item()
-            item['title'] = serie.text
-            item['url'] = serie.get('href')
             result.append(item)
         return result
 
